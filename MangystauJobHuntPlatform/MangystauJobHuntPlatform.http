@@ -1,0 +1,6 @@
+@MangystauJobHuntPlatform_HostAddress = http://localhost:5160
+
+GET {{MangystauJobHuntPlatform_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
