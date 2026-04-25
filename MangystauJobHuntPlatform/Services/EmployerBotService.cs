@@ -59,8 +59,7 @@ public class EmployerBotService
 
             case VacancyCreationStep.Address:
                 await _bot.SendMessage(chatId, "🤖 AI определяет координаты...");
-                
-                // Наш "реальный интеллект" переводит текст в Lat/Lon
+    
                 var (lat, lon) = await _aiGeocoding.GeocodeAktauAsync(msg.Text);
 
                 var vacancy = new Vacancy
@@ -70,16 +69,16 @@ public class EmployerBotService
                     District = msg.Text,
                     Latitude = lat,
                     Longitude = lon,
-                    OwnerId = chatId,
-                    // ДОБАВЬ ЭТУ СТРОКУ:
-                    RequiredSkills = "Не указано"
+                    OwnerId = chatId, // Это TelegramId работодателя
+                    RequiredSkills = "Общие навыки",
+                    CreatedAt = DateTime.UtcNow 
                 };
 
                 _db.Vacancies.Add(vacancy);
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(); // PostgreSQL сохранит OwnerId
 
                 _drafts.TryRemove(chatId, out _);
-                await _bot.SendMessage(chatId, $"✅ Вакансия опубликована!\nЛокация: {lat:F4}, {lon:F4}\nТеперь соискатели поблизости получат уведомление.");
+                await _bot.SendMessage(chatId, $"✅ Вакансия '{vacancy.Title}' опубликована!\nТеперь соискатели увидят её в поиске.");
                 break;
         }
     }

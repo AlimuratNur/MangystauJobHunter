@@ -29,7 +29,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // РЕГИСТРАЦИЯ БОТОВ
 builder.Services.AddKeyedSingleton<ITelegramBotClient>("WorkerBot", (sp, key) => 
-    new TelegramBotClient("8296938940:AAFa3S59LR7zVmQK7HNyXRGdkbF8Fb2Vjos"));
+    new TelegramBotClient("8625228162:AAEXByIhbY5OmsddjkGbngDv8hKd61U07oA"));
 
 builder.Services.AddKeyedSingleton<ITelegramBotClient>("EmployerBot", (sp, key) => 
     new TelegramBotClient("8262319697:AAGWpnSAB7kbxvXlNxRwNpCLBl123wRHYTQ"));

@@ -2,5 +2,5 @@ namespace MangystauJobHuntPlatform.Models;
 
 public enum RegistrationStep
 {
-    Name, Age, District, Completed
+    Name, Age, District, Skill, Completed
 }
