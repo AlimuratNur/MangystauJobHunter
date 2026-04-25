@@ -21,8 +21,24 @@ builder.Services.AddHttpClient<AiGeocodingService>();
 builder.Services.AddScoped<AiGeocodingService>();
 
 // 2. Настройка базы данных (берет из Railway или appsettings.json)
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-                       ?? Environment.GetEnvironmentVariable("DATABASE_URL"); // Запасной вариант для Railway
+// 1. Пытаемся взять стандартную переменную Railway для Postgres
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+
+// 2. Если её нет, ищем в конфигурации (Variables на Railway или appsettings.json)
+if (string.IsNullOrEmpty(connectionString))
+{
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+
+// 3. Если это строка в формате postgres:// (стандарт Railway), её нужно привести к формату .NET
+if (connectionString != null && connectionString.StartsWith("postgres://"))
+{
+    var uri = new Uri(connectionString);
+    var userInfo = uri.UserInfo.Split(':');
+    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+}
+
+Console.WriteLine($"[DB Debug] Итоговая строка подключения: {connectionString?.Split(';')[0]}..."); // Выведет только хост для безопасности
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
