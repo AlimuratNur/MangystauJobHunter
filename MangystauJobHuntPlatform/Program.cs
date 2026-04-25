@@ -8,6 +8,11 @@ using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables(); // Это критично для Railway!
+
 // 1. Фикс для работы с датами в PostgreSQL (обязательно!)
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -15,19 +20,13 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 
-var aiKey = Environment.GetEnvironmentVariable("GOOGLE_AI_KEY") 
-            ?? builder.Configuration["ApiConfig:Key"];
 
-if (string.IsNullOrEmpty(aiKey))
-{
-    throw new Exception("❌ GOOGLE_AI_KEY не найден в переменных окружения!");
-}
 
 
 // AI и стратегия
 builder.Services.AddScoped<IMatchingStrategy, CosineMatchingStrategy>();
 builder.Services.AddHttpClient<AiGeocodingService>();
-builder.Services.AddScoped<AiGeocodingService>();
+
 
 // 2. Настройка базы данных (берет из Railway или appsettings.json)
 // 1. Пытаемся взять стандартную переменную Railway для Postgres
