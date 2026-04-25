@@ -22,26 +22,29 @@ builder.Services.AddScoped<AiGeocodingService>();
 
 // 2. Настройка базы данных (берет из Railway или appsettings.json)
 // 1. Пытаемся взять стандартную переменную Railway для Postgres
-var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+// 1. Ищем строку везде: в переменных Railway, в секретах или в appsettings
+var rawConnectionString = Environment.GetEnvironmentVariable("DATABASE_URL") 
+                          ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-// 2. Если её нет, ищем в конфигурации (Variables на Railway или appsettings.json)
-if (string.IsNullOrEmpty(connectionString))
+if (string.IsNullOrEmpty(rawConnectionString))
 {
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    throw new Exception("❌ КРИТИЧЕСКАЯ ОШИБКА: Строка подключения к БД не найдена! Проверь Variables в Railway.");
 }
 
-// 3. Если это строка в формате postgres:// (стандарт Railway), её нужно привести к формату .NET
-if (connectionString != null && connectionString.StartsWith("postgres://"))
+string finalConnectionString = rawConnectionString;
+
+// 2. Если Railway дал строку вида postgres://user:pass@host:port/db, переделываем её для .NET
+if (rawConnectionString.StartsWith("postgres://"))
 {
-    var uri = new Uri(connectionString);
-    var userInfo = uri.UserInfo.Split(':');
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+    var databaseUri = new Uri(rawConnectionString);
+    var userInfo = databaseUri.UserInfo.Split(':');
+
+    finalConnectionString = $"Host={databaseUri.Host};Port={databaseUri.Port};Database={databaseUri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
 }
 
-Console.WriteLine($"[DB Debug] Итоговая строка подключения: {connectionString?.Split(';')[0]}..."); // Выведет только хост для безопасности
-
+// 3. Подключаем БД
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(finalConnectionString));
 
 // 3. РЕГИСТРАЦИЯ БОТОВ (Читаем токены из переменных окружения для безопасности)
 builder.Services.AddKeyedSingleton<ITelegramBotClient>("WorkerBot", (sp, key) => 
