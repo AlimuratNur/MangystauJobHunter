@@ -8,38 +8,37 @@ using Telegram.Bot;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-// Если захочешь сменить AI — просто замени CosineMatchingStrategy на другую реализацию
-builder.Services.AddScoped<IMatchingStrategy, CosineMatchingStrategy>();
 
+
+builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+builder.Services.AddHttpClient(); // Важно для IHttpClientFactory
+
+// AI и стратегия
+builder.Services.AddScoped<IMatchingStrategy, CosineMatchingStrategy>();
+builder.Services.AddHttpClient<AiGeocodingService>();
+builder.Services.AddScoped<AiGeocodingService>();
+
+// База данных
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=mangystau_jobs.db"));
 
-builder.Services.AddControllers();
+// РЕГИСТРАЦИЯ БОТОВ
+builder.Services.AddKeyedSingleton<ITelegramBotClient>("WorkerBot", (sp, key) => 
+    new TelegramBotClient("8296938940:AAFa3S59LR7zVmQK7HNyXRGdkbF8Fb2Vjos"));
 
-builder.Services.AddHttpClient("tgwebhook")
-    .AddTypedClient<ITelegramBotClient>(httpClient => 
-        new TelegramBotClient("8296938940:AAFa3S59LR7zVmQK7HNyXRGdkbF8Fb2Vjos", httpClient));
-builder.Services.AddHttpClient("tgwebhook")
-    .AddTypedClient<ITelegramBotClient>(httpClient => 
-        new TelegramBotClient("8262319697:AAGWpnSAB7kbxvXlNxRwNpCLBl123wRHYTQ", httpClient));
+builder.Services.AddKeyedSingleton<ITelegramBotClient>("EmployerBot", (sp, key) => 
+    new TelegramBotClient("8262319697:AAGWpnSAB7kbxvXlNxRwNpCLBl123wRHYTQ"));
 
-// Регистрируем наш движок бота
+// ДВИЖКИ (Scoped)
 builder.Services.AddScoped<TelegramBotService>();
+builder.Services.AddScoped<EmployerBotService>();
 
-// Фоновая служба, которая слушает сообщения
+// ФОНОВАЯ СЛУЖБА (Singleton)
 builder.Services.AddHostedService<BotBackgroundService>();
 
-// Сначала HTTP клиент (нужен для AI)
-builder.Services.AddHttpClient<AiGeocodingService>();
-
-// AI сервис
-builder.Services.AddScoped<AiGeocodingService>();
-
-
 var app = builder.Build();
+// ... дальше стандартно
 
 
 // Configure the HTTP request pipeline.
