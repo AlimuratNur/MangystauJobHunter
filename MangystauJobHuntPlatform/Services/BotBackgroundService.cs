@@ -7,28 +7,43 @@ namespace MangystauJobHuntPlatform.Services;
 
 public class BotBackgroundService:BackgroundService
 {
-    private readonly ITelegramBotClient _botClient;
+    private readonly ITelegramBotClient _workerBot;
+    private readonly ITelegramBotClient _employerBot;
     private readonly IServiceProvider _serviceProvider;
 
-    public BotBackgroundService(ITelegramBotClient botClient, IServiceProvider serviceProvider)
+    public BotBackgroundService(
+        [FromKeyedServices("WorkerBot")] ITelegramBotClient workerBot,
+        [FromKeyedServices("EmployerBot")] ITelegramBotClient employerBot,
+        IServiceProvider serviceProvider)
     {
-        _botClient = botClient;
+        _workerBot = workerBot;
+        _employerBot = employerBot;
         _serviceProvider = serviceProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Настройки получения обновлений
-        var receiverOptions = new ReceiverOptions
-        {
-            AllowedUpdates = Array.Empty<Telegram.Bot.Types.Enums.UpdateType>() 
-        };
+        // Запуск обоих ботов параллельно
+        _workerBot.StartReceiving(
+            updateHandler: async (bot, update, ct) => 
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<TelegramBotService>();
+                await service.HandleUpdate(update, ct);
+            },
+            errorHandler: async (bot, ex, ct) => Console.WriteLine(ex),
+            cancellationToken: stoppingToken
+        );
 
-        _botClient.StartReceiving(
-            HandleUpdateAsync,           // 1. Метод обработки обновлений
-            HandlePollingErrorAsync,     // 2. Метод обработки ошибок
-            receiverOptions,             // 3. Опции (может быть null)
-            stoppingToken
+        _employerBot.StartReceiving(
+            updateHandler: async (bot, update, ct) => 
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var service = scope.ServiceProvider.GetRequiredService<EmployerBotService>();
+                await service.HandleUpdate(update);
+            },
+            errorHandler: async (bot, ex, ct) => Console.WriteLine(ex),
+            cancellationToken: stoppingToken
         );
 
         await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -42,7 +57,7 @@ public class BotBackgroundService:BackgroundService
         
         try 
         {
-            await botEngine.HandleUpdateAsync(update, ct);
+            await botEngine.HandleUpdate(update, ct);
         }
         catch (Exception ex)
         {

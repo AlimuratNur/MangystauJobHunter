@@ -18,7 +18,8 @@ public class TelegramBotService
     private readonly AppDbContext _db;
     private readonly AiGeocodingService _aiGeocoding;
 
-    public TelegramBotService(ITelegramBotClient botClient, IMatchingStrategy ai, AppDbContext db,
+    public TelegramBotService([FromKeyedServices("WorkerBot")] ITelegramBotClient botClient, IMatchingStrategy ai,
+        AppDbContext db,
         IHttpClientFactory httpClientFactory, AiGeocodingService aiGeocoding)
     {
         _botClient = botClient;
@@ -28,57 +29,67 @@ public class TelegramBotService
         _aiGeocoding = aiGeocoding;
     }
 
-    public async Task HandleUpdateAsync(Update update, CancellationToken ct)
+    public async Task HandleUpdate(Update update, CancellationToken ct)
     {
-        if (update.Type == UpdateType.Message && update.Message?.Text != null)
+        // Обработка сообщений
+        if (update.Type == UpdateType.Message && update.Message != null)
         {
-            var chatId = update.Message.Chat.Id;
-            var text = update.Message.Text;
-            var message = update.Message;
-
-            if (text == "/start")
-            {
-                await _botClient.SendMessage(chatId,
-                    "Добро пожаловать в платформу занятости Мангистау! 🌊\n" +
-                    "Я помогу найти работу рядом с домом (в вашем микрорайоне).",
-                    cancellationToken: ct);
-                // Здесь можно вызвать метод регистрации или показа вакансий
-            }
-
-            // Сохраняем навыки в БД 
-            await SaveUserSkills(message.From.Id, message.Text);
-
-            // Сразу предлагаем вакансии через AI 
-            await ShowMatches(message.Chat.Id, message.From.Id, ct);
+            // Теперь ЛЮБОЕ сообщение идет в логику регистрации/обработки
+            await HandleWorkerUpdate(update, ct);
         }
 
-        // Логика быстрого отклика через Callback 
+        // Обработка кнопок
         if (update.Type == UpdateType.CallbackQuery)
         {
             await HandleCallbackAsync(update.CallbackQuery, ct);
         }
     }
 
-    private async Task ShowMatches(long chatId, long tgId, CancellationToken ct)
+    private async Task ShowMatches(long tgId, CancellationToken ct)
     {
-        var user = _db.Users.FirstOrDefault(u => u.TelegramId == tgId);
-        var vacancies = _db.Vacancies.ToList();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.TelegramId == tgId);
+        var allVacancies = await _db.Vacancies.ToListAsync();
 
-        // Ранжируем вакансии твоим косинусным движком
-        var ranked = vacancies
-            .Select(v => new { V = v, Score = _ai.CalculateScore(user.Skills, v.RequiredSkills) })
-            .OrderByDescending(x => x.Score)
-            .Take(3);
+        // Фильтруем по расстоянию (например, в радиусе 5 км)
+        var nearby = allVacancies
+            .Select(v => new
+            {
+                Vacancy = v,
+                Distance = CalculateDistance(user.Latitude, user.Longitude, v.Latitude, v.Longitude)
+            })
+            .Where(x => x.Distance <= 5.0) // 5 километров
+            .OrderBy(x => x.Distance)
+            .Take(5);
 
-        foreach (var item in ranked)
+        if (!nearby.Any())
+        {
+            await _botClient.SendMessage(tgId, "К сожалению, в вашем районе пока нет вакансий. 😔",
+                cancellationToken: ct);
+            return;
+        }
+
+        foreach (var item in nearby)
         {
             var btn = new InlineKeyboardMarkup(
-                InlineKeyboardButton.WithCallbackData("Откликнуться ✅", $"apply_{item.V.Id}"));
-
-            await _botClient.SendMessage(chatId,
-                $"📍 Район: {item.V.District}\n🔥 Подходит вам на: {item.Score:P0}\nРабота: {item.V.Title}\n{item.V.Description}",
+                InlineKeyboardButton.WithCallbackData("Откликнуться ✅", $"apply_{item.Vacancy.Id}"));
+            await _botClient.SendMessage(tgId,
+                $"🏢 {item.Vacancy.Title}\n" +
+                $"📍 Расстояние: {item.Distance:F1} км\n" +
+                $"📝 {item.Vacancy.Description}",
                 replyMarkup: btn, cancellationToken: ct);
         }
+    }
+
+// Простая функция расчета расстояния
+    private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        var d1 = lat1 * (Math.PI / 180.0);
+        var num1 = lat2 * (Math.PI / 180.0);
+        var d2 = (lat2 - lat1) * (Math.PI / 180.0);
+        var d3 = (lon2 - lon1) * (Math.PI / 180.0);
+        var a = Math.Sin(d2 / 2.0) * Math.Sin(d2 / 2.0) +
+                Math.Cos(d1) * Math.Cos(num1) * Math.Sin(d3 / 2.0) * Math.Sin(d3 / 2.0);
+        return 6371 * (2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a)));
     }
 
 
@@ -119,66 +130,89 @@ public class TelegramBotService
         await _db.SaveChangesAsync();
     }
 
-    public async Task HandleWorkerUpdate(Update update)
+    public async Task HandleWorkerUpdate(Update update, CancellationToken ct)
     {
-        var tgId = update.Message.From.Id;
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.TelegramId == tgId);
+        var msg = update.Message;
+        var tgId = msg.From.Id;
+        var text = msg.Text;
 
-        // 1. Если пользователя нет - создаем и спрашиваем ИМЯ
-        if (user == null)
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.TelegramId == tgId, cancellationToken: ct);
+
+        // Логика команды /start
+        if (text == "/start")
         {
-            user = new Users { TelegramId = tgId, Step = RegistrationStep.Name };
-            _db.Users.Add(user);
-            await _db.SaveChangesAsync();
-            await _botClient.SendMessage(tgId,
-                "Добро пожаловать! Давайте найдем вам работу в Актау. Как вас зовут?");
+            if (user != null)
+            {
+                // Сбрасываем прогресс существующего пользователя вместо удаления
+                user.Step = RegistrationStep.Name;
+                user.Name = msg.From.FirstName ?? "Пользователь";
+            }
+            else
+            {
+                // Создаем нового, если его нет
+                user = new Users
+                {
+                    TelegramId = tgId,
+                    Name = msg.From.FirstName ?? "Пользователь",
+                    Step = RegistrationStep.Name,
+                    Skills = "Не указано",
+                    Role = UserRole.Candidate
+                };
+                _db.Users.Add(user);
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await _botClient.SendMessage(tgId, "Добро пожаловать! Давайте найдем работу в Актау. Как вас зовут?",
+                cancellationToken: ct);
             return;
         }
 
-        // 2. Обработка шагов регистрации
+        // Если пользователь каким-то образом не в базе и не ввел /start
+        if (user == null) return;
+
         switch (user.Step)
         {
             case RegistrationStep.Name:
-                user.Name = update.Message.Text;
+                user.Name = text;
                 user.Step = RegistrationStep.Age;
-                await _db.SaveChangesAsync();
-                await _botClient.SendMessage(tgId, $"Приятно познакомиться, {user.Name}! Сколько вам полных лет?");
+                await _db.SaveChangesAsync(ct);
+                await _botClient.SendMessage(tgId, $"Приятно познакомиться, {user.Name}! Сколько вам лет?",
+                    cancellationToken: ct);
                 break;
 
             case RegistrationStep.Age:
-                if (int.TryParse(update.Message.Text, out int age))
+                if (int.TryParse(text, out int age))
                 {
                     user.Age = age;
                     user.Step = RegistrationStep.District;
-                    await _db.SaveChangesAsync();
-                    await _botClient.SendMessage(tgId,
-                        "В каком микрорайоне Актау вы живете или ищете работу? (Например: 14, 7 или 'возле набережной')");
+                    await _db.SaveChangesAsync(ct);
+                    await _botClient.SendMessage(tgId, "В каком микрорайоне или ЖК Актау вы живете?",
+                        cancellationToken: ct);
                 }
                 else
                 {
-                    await _botClient.SendMessage(tgId, "Пожалуйста, введите возраст цифрами.");
+                    await _botClient.SendMessage(tgId, "Пожалуйста, введите возраст числом.", cancellationToken: ct);
                 }
 
                 break;
 
             case RegistrationStep.District:
-                await _botClient.SendMessage(tgId, "Минутку, определяю ваше местоположение на карте...");
-    
-                // Вызываем AI для получения координат
-                var coords = await _aiGeocoding.GeocodeAktauAsync(update.Message.Text);
-    
+                await _botClient.SendMessage(tgId, "🤖 AI сопоставляет адрес с картой Актау...", cancellationToken: ct);
+                var coords = await _aiGeocoding.GeocodeAktauAsync(text);
                 user.Latitude = coords.lat;
                 user.Longitude = coords.lon;
                 user.Step = RegistrationStep.Completed;
-    
-                await _db.SaveChangesAsync();
-                await _botClient.SendMessage(tgId, $"📍 Место определено! Координаты: {user.Latitude}, {user.Longitude}. ");
-                
+                await _db.SaveChangesAsync(ct);
+
+                await _botClient.SendMessage(tgId,
+                    $"📍 Место зафиксировано ({user.Latitude:F3}, {user.Longitude:F3}). Ищу ближайшие вакансии...",
+                    cancellationToken: ct);
+                await ShowMatches(tgId, ct);
                 break;
 
             case RegistrationStep.Completed:
-                // Если регистрация уже пройдена, просто отвечаем на команды или показываем вакансии
-                
+                // Если регистрация завершена, любой ввод (кроме команд) заново ищет вакансии по его району
+                await ShowMatches(tgId, ct);
                 break;
         }
     }

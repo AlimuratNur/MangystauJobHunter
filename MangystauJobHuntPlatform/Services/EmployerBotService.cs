@@ -7,7 +7,7 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using System.Collections.Concurrent;
 
-public class EmployerBotEngine
+public class EmployerBotService
 {
     private readonly AppDbContext _db;
     private readonly ITelegramBotClient _bot;
@@ -16,7 +16,7 @@ public class EmployerBotEngine
     // Временное хранилище черновиков вакансий в памяти
     private static readonly ConcurrentDictionary<long, VacancyDraft> _drafts = new();
 
-    public EmployerBotEngine(AppDbContext db, ITelegramBotClient bot, AiGeocodingService aiGeocoding)
+    public EmployerBotService(AppDbContext db, [FromKeyedServices("EmployerBot")]ITelegramBotClient bot, AiGeocodingService aiGeocoding)
     {
         _db = db;
         _bot = bot;
@@ -70,7 +70,9 @@ public class EmployerBotEngine
                     District = msg.Text,
                     Latitude = lat,
                     Longitude = lon,
-                    OwnerId = chatId
+                    OwnerId = chatId,
+                    // ДОБАВЬ ЭТУ СТРОКУ:
+                    RequiredSkills = "Не указано"
                 };
 
                 _db.Vacancies.Add(vacancy);
