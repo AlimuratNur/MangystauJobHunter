@@ -32,7 +32,10 @@ if (string.IsNullOrEmpty(rawConnectionString))
 }
 
 string finalConnectionString = rawConnectionString;
-
+Console.WriteLine($"[DEBUG] Connection String Length: {finalConnectionString?.Length ?? 0}");
+if (!string.IsNullOrEmpty(finalConnectionString)) {
+    Console.WriteLine($"[DEBUG] Starts with: {finalConnectionString.Substring(0, Math.Min(10, finalConnectionString.Length))}");
+    }
 // 2. Если Railway дал строку вида postgres://user:pass@host:port/db, переделываем её для .NET
 if (rawConnectionString.StartsWith("postgres://"))
 {
@@ -40,6 +43,8 @@ if (rawConnectionString.StartsWith("postgres://"))
     var userInfo = databaseUri.UserInfo.Split(':');
 
     finalConnectionString = $"Host={databaseUri.Host};Port={databaseUri.Port};Database={databaseUri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true";
+    // В Program.cs там, где ты получаешь finalConnectionString:
+    
 }
 
 // 3. Подключаем БД
