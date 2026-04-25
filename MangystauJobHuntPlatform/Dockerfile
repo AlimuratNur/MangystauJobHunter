@@ -8,9 +8,9 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["MangystauJobHuntPlatform.csproj", "./"]
-RUN dotnet restore "MangystauJobHuntPlatform/MangystauJobHuntPlatform.csproj"
+RUN dotnet restore "MangystauJobHuntPlatform.csproj"
 COPY . .
-WORKDIR "/src/MangystauJobHuntPlatform"
+WORKDIR "/src"
 RUN dotnet build "./MangystauJobHuntPlatform.csproj" -c $BUILD_CONFIGURATION -o /app/build
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
