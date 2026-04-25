@@ -61,14 +61,12 @@ namespace MangystauJobHuntPlatform.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<string>("Name")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Skills")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Step")
@@ -112,7 +110,6 @@ namespace MangystauJobHuntPlatform.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("RequiredSkills")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Title")
