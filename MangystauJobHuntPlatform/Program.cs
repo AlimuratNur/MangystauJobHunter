@@ -45,7 +45,7 @@ if (!string.IsNullOrEmpty(finalConnectionString)) {
     Console.WriteLine($"[DEBUG] Starts with: {finalConnectionString.Substring(0, Math.Min(10, finalConnectionString.Length))}");
     }
 // 2. Если Railway дал строку вида postgres://user:pass@host:port/db, переделываем её для .NET
-if (rawConnectionString.StartsWith("postgres://"))
+if (rawConnectionString.StartsWith("postgres"))
 {
     var databaseUri = new Uri(rawConnectionString);
     var userInfo = databaseUri.UserInfo.Split(':');
