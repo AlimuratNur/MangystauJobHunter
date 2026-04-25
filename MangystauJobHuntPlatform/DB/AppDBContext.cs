@@ -1,5 +1,5 @@
 using MangystauJobHuntPlatform.Models;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore ;
 
 namespace MangystauJobHuntPlatform.DB;
 

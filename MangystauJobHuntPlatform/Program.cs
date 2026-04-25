@@ -20,8 +20,12 @@ builder.Services.AddHttpClient<AiGeocodingService>();
 builder.Services.AddScoped<AiGeocodingService>();
 
 // База данных
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=mangystau_jobs.db"));
+    options.UseNpgsql(connectionString));;
+
 
 // РЕГИСТРАЦИЯ БОТОВ
 builder.Services.AddKeyedSingleton<ITelegramBotClient>("WorkerBot", (sp, key) => 

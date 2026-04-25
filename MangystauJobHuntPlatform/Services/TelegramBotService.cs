@@ -156,13 +156,14 @@ public class TelegramBotService
                     Name = msg.From.FirstName ?? "Пользователь",
                     Step = RegistrationStep.Name,
                     Skills = "Не указано",
-                    Role = UserRole.Candidate
+                    Role = UserRole.Candidate,
+                    District = "не указан"
                 };
                 _db.Users.Add(user);
             }
 
             await _db.SaveChangesAsync(ct);
-            await _botClient.SendMessage(tgId, "Добро пожаловать! Давайте найдем работу в Актау. Как вас зовут?",
+            await _botClient.SendMessage(tgId, "Добро пожаловать! Давайте найдем работу в Актау. Как вас зовут?", 
                 cancellationToken: ct);
             return;
         }

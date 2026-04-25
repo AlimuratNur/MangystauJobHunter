@@ -12,7 +12,7 @@ public class AiGeocodingService
         // Ключ берем из https://aistudio.google.com/
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json")
+            .AddJsonFile("keys.json")
             .Build();
         
         _googleAi = new GoogleAI(config["ApiConfig:Key"]);
