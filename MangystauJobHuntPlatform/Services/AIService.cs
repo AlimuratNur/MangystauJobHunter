@@ -10,7 +10,12 @@ public class AiGeocodingService
     {
         // Инициализируем Google AI с твоим ключом
         // Ключ берем из https://aistudio.google.com/
-        _googleAi = new GoogleAI("AIzaSyCPN7WSo1298Ci_AGNVjHRACvK4WBWNfvU");
+        var config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json")
+            .Build();
+        
+        _googleAi = new GoogleAI(config["ApiConfig:Key"]);
         
         // Используем модель flash (она быстрее) или pro
         _model = _googleAi.GenerativeModel(Model.Gemini3Flash);
