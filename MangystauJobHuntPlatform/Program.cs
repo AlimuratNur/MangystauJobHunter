@@ -27,6 +27,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));;
 
 
+
 // РЕГИСТРАЦИЯ БОТОВ
 builder.Services.AddKeyedSingleton<ITelegramBotClient>("WorkerBot", (sp, key) => 
     new TelegramBotClient("8625228162:AAEXByIhbY5OmsddjkGbngDv8hKd61U07oA"));
@@ -42,8 +43,12 @@ builder.Services.AddScoped<EmployerBotService>();
 builder.Services.AddHostedService<BotBackgroundService>();
 
 var app = builder.Build();
-// ... дальше стандартно
-
+// миграция дб
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate(); // Это автоматически применит миграции к Postgres на Railway
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
