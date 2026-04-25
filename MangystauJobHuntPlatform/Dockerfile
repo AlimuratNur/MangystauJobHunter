@@ -1,0 +1,27 @@
+﻿FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+USER $APP_UID
+WORKDIR /app
+EXPOSE 8080
+EXPOSE 8081
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+COPY ["MangystauJobHuntPlatform/MangystauJobHuntPlatform.csproj", "MangystauJobHuntPlatform/"]
+RUN dotnet restore "MangystauJobHuntPlatform/MangystauJobHuntPlatform.csproj"
+COPY . .
+WORKDIR "/src/MangystauJobHuntPlatform"
+RUN dotnet build "./MangystauJobHuntPlatform.csproj" -c $BUILD_CONFIGURATION -o /app/build
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+COPY --from=build /app/out .
+
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./MangystauJobHuntPlatform.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "MangystauJobHuntPlatform.dll"]
