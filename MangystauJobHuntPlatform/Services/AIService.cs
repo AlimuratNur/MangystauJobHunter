@@ -1,31 +1,56 @@
-namespace MangystauJobHuntPlatform.Services;
+using Mscc.GenerativeAI;
+using Mscc.GenerativeAI.Types;
 
 public class AiGeocodingService
 {
-    private readonly HttpClient _httpClient;
-    private const string ApiKey = "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"; // Получается за 1 минуту на groq.com
+    private readonly GoogleAI _googleAi;
+    private readonly GenerativeModel _model;
 
-    public AiGeocodingService(HttpClient httpClient) => _httpClient = httpClient;
+    public AiGeocodingService()
+    {
+        // Инициализируем Google AI с твоим ключом
+        // Ключ берем из https://aistudio.google.com/
+        _googleAi = new GoogleAI("AIzaSyCPN7WSo1298Ci_AGNVjHRACvK4WBWNfvU");
+        
+        // Используем модель flash (она быстрее) или pro
+        _model = _googleAi.GenerativeModel(Model.Gemini3Flash);
+    }
 
     public async Task<(double lat, double lon)> GeocodeAktauAsync(string userLocationText)
     {
-        var request = new
+        try
         {
-            model = "llama-3.3-70b-versatile", // Очень мощная и быстрая модель
-            messages = new[]
-            {
-                new { role = "system", content = "You are a geocoder for Aktau, Kazakhstan. Return ONLY JSON: { \"lat\": 0.0, \"lon\": 0.0 } based on the location description." },
-                new { role = "user", content = userLocationText }
-            },
-            response_format = new { type = "json_object" }
-        };
+            // Формируем запрос
+            string prompt = $"Ты — геокодер города Актау. Напиши координаты для: '{userLocationText}'. " +
+                            "Ответ дай СТРОГО в формате JSON: {\"lat\": 43.6, \"lon\": 51.1}. Никакого текста.";
 
-        // Отправляем запрос к AI
-        var response = await _httpClient.PostAsJsonAsync("https://api.groq.com/openai/v1/chat/completions", request);
-        // 
-        var jsonParser = new JsonParsingService();
-        var coor = await jsonParser.ParseAiResponse(response);
-        
-        return (coor.lat, coor.lon); // Теперь у тебя есть реальные координаты!
+            // Вызываем генерацию
+            var response = await _model.GenerateContent(prompt);
+            var responseText = response.Text;
+
+            Console.WriteLine($"[GenAI Debug] Ответ: {responseText}");
+
+            // Извлекаем цифры регуляркой (на случай если ИИ добавит лишние символы)
+            var matches = System.Text.RegularExpressions.Regex.Matches(responseText, @"\d+\.\d+");
+
+            if (matches.Count >= 2)
+            {
+                double lat = double.Parse(matches[0].Value, System.Globalization.CultureInfo.InvariantCulture);
+                double lon = double.Parse(matches[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                // Валидация: Актау находится примерно в этих границах
+                if (lat > 43.0 && lat < 45.0)
+                {
+                    return (lat, lon);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GenAI Error] Ошибка: {ex.Message}");
+        }
+
+        // Если ИИ подвел, возвращаем центр Актау (Акимат)
+        return (43.6472, 51.1722);
     }
 }
