@@ -5,9 +5,9 @@ public class Users
    
         public int Id { get; set; }
         public long TelegramId { get; set; } // Для бота 
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public UserRole Role { get; set; }
-        public string Skills { get; set; } // Сюда пишем навыки через запятую для AI
+        public string? Skills { get; set; } // Сюда пишем навыки через запятую для AI
         
         public int Age { get; set; }
         public string District { get; set; } // Например, "14"
