@@ -5,17 +5,18 @@ public class AiGeocodingService
 {
     private readonly GoogleAI _googleAi;
     private readonly GenerativeModel _model;
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
 
-    public AiGeocodingService(IConfiguration configuration)
+    // ВАЖНО: HttpClient должен быть первым или присутствовать обязательно
+    public AiGeocodingService(HttpClient httpClient, IConfiguration configuration)
     {
-        // Сначала ищем в Environment (для Railway), потом в конфигурации (для локал)
-        var apiKey = Environment.GetEnvironmentVariable("GOOGLE_AI_KEY") 
-                     ?? configuration["ApiConfig:Key"];
+        _httpClient = httpClient;
+        _configuration = configuration;
 
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            throw new Exception("Google AI API Key is missing!");
-        }
+        var apiKey = _configuration["GOOGLE_AI_KEY"] ?? _configuration["ApiConfig:Key"];
+        // Твоя логика инициализации GoogleAI...
+    
 
         _googleAi = new GoogleAI(apiKey);
     
