@@ -15,6 +15,15 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 
+var aiKey = Environment.GetEnvironmentVariable("GOOGLE_AI_KEY") 
+            ?? builder.Configuration["ApiConfig:Key"];
+
+if (string.IsNullOrEmpty(aiKey))
+{
+    throw new Exception("❌ GOOGLE_AI_KEY не найден в переменных окружения!");
+}
+
+
 // AI и стратегия
 builder.Services.AddScoped<IMatchingStrategy, CosineMatchingStrategy>();
 builder.Services.AddHttpClient<AiGeocodingService>();

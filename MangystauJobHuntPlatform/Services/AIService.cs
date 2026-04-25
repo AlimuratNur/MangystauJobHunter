@@ -6,18 +6,20 @@ public class AiGeocodingService
     private readonly GoogleAI _googleAi;
     private readonly GenerativeModel _model;
 
-    public AiGeocodingService()
+    public AiGeocodingService(IConfiguration configuration)
     {
-        // Инициализируем Google AI с твоим ключом
-        // Ключ берем из https://aistudio.google.com/
-        var config = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("keys.json")
-            .Build();
-        
-        _googleAi = new GoogleAI(config["ApiConfig:Key"]);
-        
-        // Используем модель flash (она быстрее) или pro
+        // Сначала ищем в Environment (для Railway), потом в конфигурации (для локал)
+        var apiKey = Environment.GetEnvironmentVariable("GOOGLE_AI_KEY") 
+                     ?? configuration["ApiConfig:Key"];
+
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new Exception("Google AI API Key is missing!");
+        }
+
+        _googleAi = new GoogleAI(apiKey);
+    
+        // Твой оригинальный код (Gemini 1.5 Flash или Pro)
         _model = _googleAi.GenerativeModel(Model.Gemini3Flash);
     }
 
